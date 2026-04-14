@@ -1,8 +1,9 @@
 """
-Mouse Keeper - 屏幕保持唤醒工具
+Mouse Keeper - Screen Sleep Prevention Tool
 Simulates mouse micro-movements to prevent screen from sleeping.
 The movements are imperceptible and won't interfere with your work.
 Uses Windows SetThreadExecutionState API for reliable sleep prevention.
+Supports English and Chinese UI.
 """
 
 import tkinter as tk
@@ -78,7 +79,7 @@ def set_keep_awake(enable: bool):
     else:
         ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
 
-def get_screen_timeout():
+def get_screen_timeout(lang="zh"):
     """Query the current screen off timeout from Windows power settings."""
     try:
         result = subprocess.run(
@@ -90,12 +91,78 @@ def get_screen_timeout():
                 hex_val = line.strip().split('0x')[-1]
                 seconds = int(hex_val, 16)
                 if seconds == 0:
-                    return "从不"
+                    return "Never" if lang == "en" else "从不"
                 minutes = seconds // 60
-                return f"{minutes} 分钟"
-        return "未知"
+                return f"{minutes} min" if lang == "en" else f"{minutes} 分钟"
+        return "Unknown" if lang == "en" else "未知"
     except Exception:
-        return "未知"
+        return "Unknown" if lang == "en" else "未知"
+
+# ─── Translations ────────────────────────────────────────────────────────────
+TRANSLATIONS = {
+    "zh": {
+        "window_title":     "Mouse Keeper - 屏幕保持唤醒",
+        "header_title":     "🖱️  Mouse Keeper",
+        "header_subtitle":  "防止屏幕休眠 · 模拟鼠标微移动",
+        "ring_ready":       "就绪",
+        "ring_running":     "运行中",
+        "ring_stopped":     "已停止",
+        "idle_title":       "⏱ 系统空闲时间",
+        "idle_0":           "0 秒",
+        "countdown_title":  "⏳ 下次模拟",
+        "timeout_title":    "🖥 屏幕超时",
+        "idle_hint":        "💡 空闲时间在每次模拟后会重置为 0，证明防休眠有效",
+        "stat_count":       "模拟次数",
+        "stat_interval":    "间隔 (秒)",
+        "stat_status":      "状态",
+        "status_standby":   "待机",
+        "status_active":    "活跃",
+        "slider_label":     "模拟间隔",
+        "btn_start":        "▶  开始",
+        "btn_stop":         "⏹  停止",
+        "log_title":        "📋 活动日志",
+        "footer":           "鼠标微移动 · 不影响正常使用 · 零点击",
+        "lang_btn":         "EN",
+        "log_start":        "▶ 开始运行 (间隔: {interval}秒)",
+        "log_timeout":      "ℹ 屏幕超时设置: {timeout}",
+        "log_stop":         "⏹ 已停止 (共模拟 {count} 次)",
+        "log_sim":          "✦ 第 {count} 次模拟完成 (空闲已重置: {idle:.1f}秒)",
+        "idle_lt1":         "< 1 秒",
+        "idle_sec":         "{val:.0f} 秒",
+        "idle_min":         "{val:.1f} 分",
+    },
+    "en": {
+        "window_title":     "Mouse Keeper - Screen Awake",
+        "header_title":     "🖱️  Mouse Keeper",
+        "header_subtitle":  "Prevent Sleep · Simulate Mouse Movement",
+        "ring_ready":       "Ready",
+        "ring_running":     "Running",
+        "ring_stopped":     "Stopped",
+        "idle_title":       "⏱ System Idle",
+        "idle_0":           "0 sec",
+        "countdown_title":  "⏳ Next Sim",
+        "timeout_title":    "🖥 Screen Off",
+        "idle_hint":        "💡 Idle time resets to 0 after each simulation, confirming prevention is active",
+        "stat_count":       "Sim Count",
+        "stat_interval":    "Interval (s)",
+        "stat_status":      "Status",
+        "status_standby":   "Standby",
+        "status_active":    "Active",
+        "slider_label":     "Simulation Interval",
+        "btn_start":        "▶  Start",
+        "btn_stop":         "⏹  Stop",
+        "log_title":        "📋 Activity Log",
+        "footer":           "Micro-movements · Non-intrusive · Zero clicks",
+        "lang_btn":         "中文",
+        "log_start":        "▶ Started (interval: {interval}s)",
+        "log_timeout":      "ℹ Screen timeout: {timeout}",
+        "log_stop":         "⏹ Stopped ({count} simulations total)",
+        "log_sim":          "✦ Simulation #{count} done (idle reset: {idle:.1f}s)",
+        "idle_lt1":         "< 1 sec",
+        "idle_sec":         "{val:.0f} sec",
+        "idle_min":         "{val:.1f} min",
+    },
+}
 
 # ─── Color Palette ───────────────────────────────────────────────────────────
 COLORS = {
@@ -135,7 +202,7 @@ class PulseRing(tk.Canvas):
         self.flash_step = 0
         self._draw_static()
 
-    def _draw_static(self):
+    def _draw_static(self, lang="zh"):
         self.delete("all")
         r = self.size // 2 - 15
         # Background ring
@@ -144,9 +211,10 @@ class PulseRing(tk.Canvas):
             outline=COLORS["ring_track"], width=6, tags="bg_ring"
         )
         # Status text
+        t = TRANSLATIONS.get(lang, TRANSLATIONS["zh"])
         self.status_text = self.create_text(
             self.cx, self.cy - 10,
-            text="就绪", font=("Segoe UI", 14, "bold"),
+            text=t["ring_ready"], font=("Segoe UI", 14, "bold"),
             fill=COLORS["text_dim"], tags="status"
         )
         self.time_text = self.create_text(
@@ -155,12 +223,13 @@ class PulseRing(tk.Canvas):
             fill=COLORS["text"], tags="timer"
         )
 
-    def set_active(self, active: bool):
+    def set_active(self, active: bool, lang="zh"):
         self.active = active
+        t = TRANSLATIONS.get(lang, TRANSLATIONS["zh"])
         if active:
-            self.itemconfig("status", text="运行中", fill=COLORS["success"])
+            self.itemconfig("status", text=t["ring_running"], fill=COLORS["success"])
         else:
-            self.itemconfig("status", text="已停止", fill=COLORS["text_dim"])
+            self.itemconfig("status", text=t["ring_stopped"], fill=COLORS["text_dim"])
             self._draw_static_arc()
 
     def _draw_static_arc(self):
@@ -228,7 +297,10 @@ class MouseKeeperApp:
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Mouse Keeper - 屏幕保持唤醒")
+        self.lang = "zh"  # Default language: Chinese
+        self.t = TRANSLATIONS[self.lang]
+
+        self.root.title(self.t["window_title"])
         self.root.configure(bg=COLORS["bg_dark"])
         self.root.resizable(False, False)
 
@@ -253,7 +325,10 @@ class MouseKeeperApp:
         self.click_count = 0
         self.interval = 30  # seconds between simulations
         self.countdown = 0  # countdown to next simulation
-        self.screen_timeout_str = get_screen_timeout()
+        self.screen_timeout_str = get_screen_timeout(self.lang)
+
+        # Track labels that need language updates
+        self._i18n_labels = {}
 
         self._build_ui()
         self._update_clock()
@@ -262,26 +337,46 @@ class MouseKeeperApp:
         # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    def _tr(self, key):
+        """Get translation for current language."""
+        return self.t.get(key, key)
+
     def _build_ui(self):
         # ── Header ──
         header = tk.Frame(self.root, bg=COLORS["bg_dark"])
         header.pack(fill="x", pady=(16, 0))
 
-        tk.Label(
-            header, text="🖱️  Mouse Keeper",
+        # Language toggle button (top-right)
+        self.lang_btn = tk.Button(
+            header, text=self._tr("lang_btn"),
+            font=("Segoe UI", 9, "bold"),
+            fg=COLORS["text"], bg=COLORS["bg_card"],
+            activebackground=COLORS["bg_card_alt"],
+            activeforeground=COLORS["text"],
+            relief="flat", cursor="hand2",
+            width=4, height=1,
+            command=self._toggle_language
+        )
+        self.lang_btn.place(relx=1.0, x=-10, y=0, anchor="ne")
+
+        self.title_label = tk.Label(
+            header, text=self._tr("header_title"),
             font=("Segoe UI", 22, "bold"),
             fg=COLORS["text"], bg=COLORS["bg_dark"]
-        ).pack()
-        tk.Label(
-            header, text="防止屏幕休眠 · 模拟鼠标微移动",
+        )
+        self.title_label.pack()
+        self.subtitle_label = tk.Label(
+            header, text=self._tr("header_subtitle"),
             font=("Segoe UI", 10),
             fg=COLORS["text_dim"], bg=COLORS["bg_dark"]
-        ).pack(pady=(2, 0))
+        )
+        self.subtitle_label.pack(pady=(2, 0))
 
         # ── Pulse Ring ──
         ring_frame = tk.Frame(self.root, bg=COLORS["bg_dark"])
         ring_frame.pack(pady=(12, 6))
         self.pulse_ring = PulseRing(ring_frame, size=200)
+        self.pulse_ring._draw_static(self.lang)
         self.pulse_ring.pack()
 
         # ── System Monitor Cards ──
@@ -292,9 +387,10 @@ class MouseKeeperApp:
         idle_card = tk.Frame(monitor_frame, bg=COLORS["bg_card"], padx=10, pady=6)
         idle_card.grid(row=0, column=0, padx=3, sticky="nsew")
         monitor_frame.columnconfigure(0, weight=1)
-        tk.Label(idle_card, text="⏱ 系统空闲时间", font=("Segoe UI", 8),
-                 fg=COLORS["text_dim"], bg=COLORS["bg_card"]).pack()
-        self.idle_label = tk.Label(idle_card, text="0 秒", font=("Segoe UI", 13, "bold"),
+        self.idle_title_label = tk.Label(idle_card, text=self._tr("idle_title"), font=("Segoe UI", 8),
+                 fg=COLORS["text_dim"], bg=COLORS["bg_card"])
+        self.idle_title_label.pack()
+        self.idle_label = tk.Label(idle_card, text=self._tr("idle_0"), font=("Segoe UI", 13, "bold"),
                                    fg=COLORS["warning"], bg=COLORS["bg_card"])
         self.idle_label.pack()
 
@@ -302,8 +398,9 @@ class MouseKeeperApp:
         cd_card = tk.Frame(monitor_frame, bg=COLORS["bg_card"], padx=10, pady=6)
         cd_card.grid(row=0, column=1, padx=3, sticky="nsew")
         monitor_frame.columnconfigure(1, weight=1)
-        tk.Label(cd_card, text="⏳ 下次模拟", font=("Segoe UI", 8),
-                 fg=COLORS["text_dim"], bg=COLORS["bg_card"]).pack()
+        self.countdown_title_label = tk.Label(cd_card, text=self._tr("countdown_title"), font=("Segoe UI", 8),
+                 fg=COLORS["text_dim"], bg=COLORS["bg_card"])
+        self.countdown_title_label.pack()
         self.countdown_label = tk.Label(cd_card, text="--", font=("Segoe UI", 13, "bold"),
                                          fg=COLORS["accent"], bg=COLORS["bg_card"])
         self.countdown_label.pack()
@@ -312,17 +409,19 @@ class MouseKeeperApp:
         to_card = tk.Frame(monitor_frame, bg=COLORS["bg_card"], padx=10, pady=6)
         to_card.grid(row=0, column=2, padx=3, sticky="nsew")
         monitor_frame.columnconfigure(2, weight=1)
-        tk.Label(to_card, text="🖥 屏幕超时", font=("Segoe UI", 8),
-                 fg=COLORS["text_dim"], bg=COLORS["bg_card"]).pack()
-        tk.Label(to_card, text=self.screen_timeout_str, font=("Segoe UI", 13, "bold"),
-                 fg=COLORS["text"], bg=COLORS["bg_card"]).pack()
+        self.timeout_title_label = tk.Label(to_card, text=self._tr("timeout_title"), font=("Segoe UI", 8),
+                 fg=COLORS["text_dim"], bg=COLORS["bg_card"])
+        self.timeout_title_label.pack()
+        self.timeout_value_label = tk.Label(to_card, text=self.screen_timeout_str, font=("Segoe UI", 13, "bold"),
+                 fg=COLORS["text"], bg=COLORS["bg_card"])
+        self.timeout_value_label.pack()
 
         # ── Info label ──
         info_frame = tk.Frame(self.root, bg=COLORS["bg_dark"])
         info_frame.pack(fill="x", padx=25, pady=(2, 2))
         self.idle_info = tk.Label(
             info_frame,
-            text="💡 空闲时间在每次模拟后会重置为 0，证明防休眠有效",
+            text=self._tr("idle_hint"),
             font=("Segoe UI", 8), fg=COLORS["text_muted"], bg=COLORS["bg_dark"],
             wraplength=380, justify="left"
         )
@@ -332,20 +431,21 @@ class MouseKeeperApp:
         stats_frame = tk.Frame(self.root, bg=COLORS["bg_dark"])
         stats_frame.pack(fill="x", padx=40, pady=(6, 4))
 
-        self._build_stat_card(stats_frame, "模拟次数", "click_label", "0", 0)
-        self._build_stat_card(stats_frame, "间隔 (秒)", "interval_label",
+        self.stat_count_card_label = self._build_stat_card(stats_frame, self._tr("stat_count"), "click_label", "0", 0)
+        self.stat_interval_card_label = self._build_stat_card(stats_frame, self._tr("stat_interval"), "interval_label",
                               str(self.interval), 1)
-        self._build_stat_card(stats_frame, "状态", "status_label", "待机", 2)
+        self.stat_status_card_label = self._build_stat_card(stats_frame, self._tr("stat_status"), "status_label", self._tr("status_standby"), 2)
 
         # ── Interval Slider ──
         slider_frame = tk.Frame(self.root, bg=COLORS["bg_dark"])
         slider_frame.pack(fill="x", padx=40, pady=(6, 4))
 
-        tk.Label(
-            slider_frame, text="模拟间隔",
+        self.slider_label = tk.Label(
+            slider_frame, text=self._tr("slider_label"),
             font=("Segoe UI", 9),
             fg=COLORS["text_dim"], bg=COLORS["bg_dark"]
-        ).pack(anchor="w")
+        )
+        self.slider_label.pack(anchor="w")
 
         self.interval_slider = tk.Scale(
             slider_frame, from_=5, to=120, orient="horizontal",
@@ -371,7 +471,7 @@ class MouseKeeperApp:
         btn_frame.pack(pady=(10, 6))
 
         self.start_btn = tk.Button(
-            btn_frame, text="▶  开始", font=("Segoe UI", 13, "bold"),
+            btn_frame, text=self._tr("btn_start"), font=("Segoe UI", 13, "bold"),
             fg="#ffffff", bg=COLORS["accent"],
             activebackground=COLORS["accent_hover"],
             activeforeground="#ffffff",
@@ -384,11 +484,12 @@ class MouseKeeperApp:
         # ── Event Log ──
         log_header = tk.Frame(self.root, bg=COLORS["bg_dark"])
         log_header.pack(fill="x", padx=20, pady=(4, 2))
-        tk.Label(
-            log_header, text="📋 活动日志",
+        self.log_title_label = tk.Label(
+            log_header, text=self._tr("log_title"),
             font=("Segoe UI", 10, "bold"),
             fg=COLORS["text_dim"], bg=COLORS["bg_dark"]
-        ).pack(anchor="w")
+        )
+        self.log_title_label.pack(anchor="w")
 
         log_container = tk.Frame(self.root, bg=COLORS["border"], padx=1, pady=1)
         log_container.pack(fill="both", expand=True, padx=20, pady=(0, 4))
@@ -413,12 +514,76 @@ class MouseKeeperApp:
         self.log_text.tag_configure("idle_reset", foreground=COLORS["warning"])
 
         # ── Footer ──
-        tk.Label(
+        self.footer_label = tk.Label(
             self.root,
-            text="鼠标微移动 · 不影响正常使用 · 零点击",
+            text=self._tr("footer"),
             font=("Segoe UI", 8),
             fg=COLORS["text_muted"], bg=COLORS["bg_dark"]
-        ).pack(side="bottom", pady=(0, 8))
+        )
+        self.footer_label.pack(side="bottom", pady=(0, 8))
+
+    def _toggle_language(self):
+        """Switch between Chinese and English."""
+        self.lang = "en" if self.lang == "zh" else "zh"
+        self.t = TRANSLATIONS[self.lang]
+        self._apply_language()
+
+    def _apply_language(self):
+        """Update all UI elements to the current language."""
+        t = self.t
+
+        # Window title
+        self.root.title(t["window_title"])
+
+        # Header
+        self.lang_btn.config(text=t["lang_btn"])
+        self.title_label.config(text=t["header_title"])
+        self.subtitle_label.config(text=t["header_subtitle"])
+
+        # Pulse ring status
+        if self.running:
+            self.pulse_ring.itemconfig("status", text=t["ring_running"])
+        else:
+            self.pulse_ring.itemconfig("status",
+                text=t["ring_ready"] if self.elapsed_seconds == 0 else t["ring_stopped"])
+
+        # Monitor cards
+        self.idle_title_label.config(text=t["idle_title"])
+        self.countdown_title_label.config(text=t["countdown_title"])
+        self.timeout_title_label.config(text=t["timeout_title"])
+
+        # Update screen timeout value with new language
+        self.screen_timeout_str = get_screen_timeout(self.lang)
+        self.timeout_value_label.config(text=self.screen_timeout_str)
+
+        # Info hint
+        self.idle_info.config(text=t["idle_hint"])
+
+        # Stat cards
+        self.stat_count_card_label.config(text=t["stat_count"])
+        self.stat_interval_card_label.config(text=t["stat_interval"])
+        self.stat_status_card_label.config(text=t["stat_status"])
+
+        # Status value
+        if self.running:
+            self.status_label.config(text=t["status_active"])
+        else:
+            self.status_label.config(text=t["status_standby"])
+
+        # Slider
+        self.slider_label.config(text=t["slider_label"])
+
+        # Button
+        if self.running:
+            self.start_btn.config(text=t["btn_stop"])
+        else:
+            self.start_btn.config(text=t["btn_start"])
+
+        # Log title
+        self.log_title_label.config(text=t["log_title"])
+
+        # Footer
+        self.footer_label.config(text=t["footer"])
 
     def _log(self, message, tag="info"):
         """Add a timestamped entry to the event log."""
@@ -434,16 +599,18 @@ class MouseKeeperApp:
         card.grid(row=0, column=col, padx=4, sticky="nsew")
         parent.columnconfigure(col, weight=1)
 
-        tk.Label(
+        title_lbl = tk.Label(
             card, text=label, font=("Segoe UI", 8),
             fg=COLORS["text_dim"], bg=COLORS["bg_card"]
-        ).pack()
+        )
+        title_lbl.pack()
         lbl = tk.Label(
             card, text=value, font=("Segoe UI", 14, "bold"),
             fg=COLORS["text"], bg=COLORS["bg_card"]
         )
         lbl.pack()
         setattr(self, attr_name, lbl)
+        return title_lbl  # Return title label for i18n updates
 
     def _on_interval_change(self, val):
         self.interval = int(val)
@@ -463,12 +630,12 @@ class MouseKeeperApp:
 
         # UI updates
         self.start_btn.config(
-            text="⏹  停止", bg=COLORS["danger"],
+            text=self._tr("btn_stop"), bg=COLORS["danger"],
             activebackground="#fb9a9a"
         )
-        self.status_label.config(text="活跃", fg=COLORS["success"])
+        self.status_label.config(text=self._tr("status_active"), fg=COLORS["success"])
         self.click_label.config(text="0")
-        self.pulse_ring.set_active(True)
+        self.pulse_ring.set_active(True, self.lang)
         self.pulse_ring.animate()
         self.interval_slider.config(state="disabled")
 
@@ -476,8 +643,8 @@ class MouseKeeperApp:
         set_keep_awake(True)
 
         # Log start event
-        self._log(f"▶ 开始运行 (间隔: {self.interval}秒)", "start")
-        self._log(f"ℹ 屏幕超时设置: {self.screen_timeout_str}", "info")
+        self._log(self._tr("log_start").format(interval=self.interval), "start")
+        self._log(self._tr("log_timeout").format(timeout=self.screen_timeout_str), "info")
 
         # Start worker thread
         self.worker_thread = threading.Thread(target=self._worker, daemon=True)
@@ -489,11 +656,11 @@ class MouseKeeperApp:
 
         # UI updates
         self.start_btn.config(
-            text="▶  开始", bg=COLORS["accent"],
+            text=self._tr("btn_start"), bg=COLORS["accent"],
             activebackground=COLORS["accent_hover"]
         )
-        self.status_label.config(text="待机", fg=COLORS["text"])
-        self.pulse_ring.set_active(False)
+        self.status_label.config(text=self._tr("status_standby"), fg=COLORS["text"])
+        self.pulse_ring.set_active(False, self.lang)
         self.interval_slider.config(state="normal")
         self.countdown_label.config(text="--")
 
@@ -501,7 +668,7 @@ class MouseKeeperApp:
         set_keep_awake(False)
 
         # Log stop event
-        self._log(f"⏹ 已停止 (共模拟 {self.click_count} 次)", "stop")
+        self._log(self._tr("log_stop").format(count=self.click_count), "stop")
 
     def _worker(self):
         """Background thread that periodically simulates mouse micro-movement."""
@@ -538,7 +705,7 @@ class MouseKeeperApp:
         # Log the event
         idle = get_idle_seconds()
         self._log(
-            f"✦ 第 {self.click_count} 次模拟完成 (空闲已重置: {idle:.1f}秒)",
+            self._tr("log_sim").format(count=self.click_count, idle=idle),
             "event"
         )
 
@@ -547,24 +714,25 @@ class MouseKeeperApp:
         idle = get_idle_seconds()
 
         if idle < 1:
-            idle_text = "< 1 秒"
+            idle_text = self._tr("idle_lt1")
             color = COLORS["success"]
         elif idle < 10:
-            idle_text = f"{idle:.0f} 秒"
+            idle_text = self._tr("idle_sec").format(val=idle)
             color = COLORS["success"]
         elif idle < 60:
-            idle_text = f"{idle:.0f} 秒"
+            idle_text = self._tr("idle_sec").format(val=idle)
             color = COLORS["warning"]
         else:
             minutes = idle / 60
-            idle_text = f"{minutes:.1f} 分"
+            idle_text = self._tr("idle_min").format(val=minutes)
             color = COLORS["danger"]
 
         self.idle_label.config(text=idle_text, fg=color)
 
         # Update countdown
         if self.running and self.countdown > 0:
-            self.countdown_label.config(text=f"{self.countdown} 秒")
+            cd_unit = "s" if self.lang == "en" else " 秒"
+            self.countdown_label.config(text=f"{self.countdown}{cd_unit}")
         elif not self.running:
             self.countdown_label.config(text="--")
 
